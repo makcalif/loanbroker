@@ -62,7 +62,7 @@ public class BankController {
 
         return Flux.from(banksUrl)
                 .flatMap(bankUrl -> {
-                    Mono<Quotation> mq = dummyRequestForQuotation(bankUrl, loanAmount);
+                    Mono<Quotation> mq = requestForQuotation(bankUrl, loanAmount);
                     // .onErrorResume(e -> Mono.just(QUOTATION_IN_CASE_OF_ERROR));
                     return mq;
                 })
@@ -94,24 +94,35 @@ public class BankController {
         return Mono.just(new Quotation("Bank-1", 1000d));
     }
 
-    Mono<BestQuotationResponse> requestForQuotation(String bankUrl, Double loanAmount) {
+    Mono<Quotation> requestForQuotation(String bankUrl, Double loanAmount) {
+        return WebClient.create().get()
+                .uri(builder -> builder.scheme("http")
+                        .port(8080)
+                        .host("localhost").path(bankUrl + "/quotation")
+                        .queryParam("loanAmount", loanAmount)
+                        .build())
+                .retrieve().bodyToMono(Quotation.class);
+
+    }
+
+    Mono<Quotation> xrequestForQuotation(String bankUrl, Double loanAmount) {
 //        ClientRequest<Void> requet = ClientRequest.create(HttpMethod.GET, bankUrl)
 //                .
 //                );
         int i =0;
         WebClient webClient = WebClient
                 .builder()
-                .baseUrl("http://localhost:8080")
+                //.baseUrl("localhost:8080")
                 .build();
 
         //WebClient.UriSpec<WebClient.RequestBodySpec> request = webClient.method(HttpMethod.GET);
         WebClient.RequestBodySpec getReq = webClient.method(HttpMethod.GET)
-                .uri("getBestQuotation");
+                .uri("/" + bankUrl + "/quotation?loanAmount=" + loanAmount);
 
         //WebClient.ResponseSpec response =
                 return getReq
                 .retrieve()
-                .bodyToMono(BestQuotationResponse.class);
+                .bodyToMono(Quotation.class);
     }
 
 }

@@ -1,0 +1,4 @@
+spring:
+logging:
+  level:
+    reactor.ipc.netty.channel.ChannelOperationsHandler: DEBUG

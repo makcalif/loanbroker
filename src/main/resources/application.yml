@@ -1,0 +1,5 @@
+spring:
+logging:
+  level:
+    reactor.ipc.netty.channel.ChannelOperationsHandler: TRACE
+    org.springframework.web.reactive.function.client: DEBUG
