@@ -17,6 +17,7 @@ import javax.naming.ServiceUnavailableException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collector;
 
 @RestController
 public class BankController {
@@ -47,18 +48,38 @@ public class BankController {
         Flux<String> banksUrl = Flux.just("Bank-1", "Bank-2", "Bank-3");
         Double loanAmount = 1000d;
 
+//        Flux<Quotation> f  =  Flux.from(banksUrl)
+//                .flatMap(bankUrl -> requestForQuotation(bankUrl, loanAmount)
+//                        .onErrorReturn(QUOTATION_IN_CASE_OF_ERROR));
+
+        //Flux<Quotation> q = f.take(1);
+//        f.doOnNext( System.out::println)
+//                .doOnError(e -> {
+//                    e.printStackTrace();
+//                });
+
+        //return Mono.just(new BestQuotationResponse());
 
         return Flux.from(banksUrl)
-                .flatMap(bankUrl -> requestForQuotation(bankUrl, loanAmount)
-                        .onErrorReturn(QUOTATION_IN_CASE_OF_ERROR))
-                .filter(offer -> !offer.equals(QUOTATION_IN_CASE_OF_ERROR))
-                .collect(() -> new BestQuotationResponse(loanAmount), BestQuotationResponse::bestOffer)
+                .flatMap(bankUrl -> {
+                    Mono<Quotation> mq = dummyRequestForQuotation(bankUrl, loanAmount);
+                    // .onErrorResume(e -> Mono.just(QUOTATION_IN_CASE_OF_ERROR));
+                    return mq;
+                })
+                .log()
+                .filter(offer -> {
+                    logger.info("offer is {} ", offer);
+                    return !offer.equals(QUOTATION_IN_CASE_OF_ERROR);
+                })
+                .collect(() -> new BestQuotationResponse(loanAmount), BestQuotationResponse::offer)
                 .doOnSuccess(BestQuotationResponse::finish)
-                .flatMap(bqr -> Mono.justOrEmpty(selectBestQuotation(bqr.getOffers()))
-                        .map(bestQuotation -> {
-                            bqr.bestOffer(bestQuotation);
-                            return bqr;
-                        }))
+                .flatMap(bqr -> {
+                       return Mono.justOrEmpty(selectBestQuotation(bqr.getOffers()))
+                            .map(bestQuotation -> {
+                                bqr.bestOffer(bestQuotation);
+                                return bqr;
+                            });
+                })
                 .timeout(Duration.ofMillis(3000))
                 .single();
     }
@@ -69,24 +90,28 @@ public class BankController {
                         .findFirst());
     }
 
-    Mono<Quotation> requestForQuotation(String bankUrl, Double loanAmount) {
+    Mono<Quotation> dummyRequestForQuotation(String bankUrl, Double loanAmount) {
+        return Mono.just(new Quotation("Bank-1", 1000d));
+    }
+
+    Mono<BestQuotationResponse> requestForQuotation(String bankUrl, Double loanAmount) {
 //        ClientRequest<Void> requet = ClientRequest.create(HttpMethod.GET, bankUrl)
 //                .
 //                );
-
+        int i =0;
         WebClient webClient = WebClient
                 .builder()
-                .baseUrl("http://localhost")
+                .baseUrl("http://localhost:8080")
                 .build();
 
         //WebClient.UriSpec<WebClient.RequestBodySpec> request = webClient.method(HttpMethod.GET);
         WebClient.RequestBodySpec getReq = webClient.method(HttpMethod.GET)
-                .uri(bankUrl);
+                .uri("getBestQuotation");
 
         //WebClient.ResponseSpec response =
                 return getReq
                 .retrieve()
-                .bodyToMono(Quotation.class);
+                .bodyToMono(BestQuotationResponse.class);
     }
 
 }

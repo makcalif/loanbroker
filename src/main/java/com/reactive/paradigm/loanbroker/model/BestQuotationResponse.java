@@ -1,8 +1,13 @@
 package com.reactive.paradigm.loanbroker.model;
 
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
+@Data
 public class BestQuotationResponse {
     private long timestamp = System.currentTimeMillis();
     private Double requestedLoanAmount = 0d;
@@ -52,4 +57,15 @@ public class BestQuotationResponse {
     public String toString() {
         return requestedLoanAmount +" : "+ getBestOffer().toString();
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        BestQuotationResponse that = (BestQuotationResponse) o;
+        return   Objects.equals(requestedLoanAmount, that.requestedLoanAmount) &&
+                //Objects.equals(offers, that.offers) &&
+                Objects.equals(bestOffer, that.bestOffer);
+    }
+
 }
