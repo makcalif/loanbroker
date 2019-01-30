@@ -4,13 +4,21 @@ import com.reactive.paradigm.loanbroker.model.BestQuotationResponse;
 import com.reactive.paradigm.loanbroker.model.Quotation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.reactive.ClientHttpResponse;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.reactive.function.BodyExtractor;
 import org.springframework.web.reactive.function.client.ClientResponse;
+import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -34,12 +42,14 @@ public class BankController {
         double interestRate = bankIndex == '5' ? 0.001d : ((double) bankIndex) / 100d;
         logger.info("interest rate for bank {} is {}", bank, interestRate);
 
-        if(bankIndex== '2') {
-            return Mono.error(new ServiceUnavailableException("bank-" + bankIndex + " service is unavilable"));
+        if (bankIndex == '2') {
+//            if (2> 1)
+//                throw new RuntimeException("mk runtime excpeiton");
+            return Mono.error(new ServiceUnavailableException("bank-" + bankIndex + " service is unavailable"));
         }
 
         if (bankIndex == '3') {
-            return Mono.delay(Duration.ofMillis(6000))
+            return Mono.delay(Duration.ofMillis(4000))
                     .log()
                     .then(Mono.just(new Quotation("Bank-" + bankIndex, loanAmount)));
         }
@@ -72,7 +82,6 @@ public class BankController {
                                 return bqr;
                             });
                 })
-                .timeout(Duration.ofMillis(4000)) // propagate a timeout exception as soon as no item is emitted
                 .single();
     }
 
@@ -82,17 +91,39 @@ public class BankController {
                         .findFirst());
     }
 
-    Mono<Quotation> requestForQuotation(String bankUrl, Double loanAmount) {
+    public Mono<Quotation>  requestForQuotation(String bankUrl, Double loanAmount) {
 
-        Function timeoutHandler = (clientResp) -> { return ClientResponse.create(HttpStatus.BAD_GATEWAY); };
+        //ClientResponse clientResponse = ClientResponse.create(HttpStatus.OK).build();
+
+        //Function timeoutHandler = (clientResp) -> { return ClientResponse.create(HttpStatus.BAD_GATEWAY); };
         return WebClient.create().get()
                 .uri(builder -> builder.scheme("http")
                         .port(8080)
                         .host("localhost").path(bankUrl + "/quotation")
                         .queryParam("loanAmount", loanAmount)
                         .build())
-                .retrieve()
-//                .onStatus(HttpStatus::isError, () -> Mono.just(new Quotation("itmoutout", 33d)))
+                .exchange()
+                //Note that Unlike retrieve() method, the exchange() method does not throw exceptions
+                // in case of 4xx or 5xx responses. You need to check the status codes yourself and handle
+                // them in the way you want to.
+                .flatMap(res -> {
+                    if (res.statusCode().is5xxServerError()) {
+                        return Mono.just(QUOTATION_IN_CASE_OF_ERROR);
+                    }
+                    return res.bodyToMono(Quotation.class);
+                })
+                .timeout(Duration.ofSeconds(3), Mono.just(new Quotation(bankUrl + "timed out", 0.00)));
+    }
+
+    public Mono<Quotation> requestForQuotationUsingRetrieve(String bankUrl, Double loanAmount) {
+        return WebClient.create().get()
+                .uri(builder -> builder.scheme("http")
+                        .port(8080)
+                        .host("localhost").path(bankUrl + "/quotation")
+                        .queryParam("loanAmount", loanAmount)
+                        .build())
+                .retrieve() // retrieve will cause an exception to be thrown at caller
+                .onStatus(HttpStatus::isError, (ex) -> Mono.just(new Throwable("server mk error:" + ex)))
 //                .onStatus(HttpStatus::isError, timeoutHandler)
 //                .onStatus(HttpStatus::is5xxServerError, timeoutHandler)
                 .bodyToMono(Quotation.class)
