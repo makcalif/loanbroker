@@ -4,10 +4,12 @@ import com.reactive.paradigm.loanbroker.model.BestQuotationResponse;
 import com.reactive.paradigm.loanbroker.model.Quotation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -16,6 +18,8 @@ import javax.naming.ServiceUnavailableException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 
 @RestController
 public class BankController {
@@ -35,7 +39,9 @@ public class BankController {
         }
 
         if (bankIndex == '3') {
-            return Mono.delay(Duration.ofMillis(2000)).then(Mono.just(new Quotation("Bank-" + bankIndex, loanAmount)));
+            return Mono.delay(Duration.ofMillis(6000))
+                    .log()
+                    .then(Mono.just(new Quotation("Bank-" + bankIndex, loanAmount)));
         }
 
         return Mono.just(new Quotation("Bank-" + bankIndex, loanAmount * interestRate));
@@ -66,7 +72,7 @@ public class BankController {
                                 return bqr;
                             });
                 })
-                .timeout(Duration.ofMillis(13000))
+                .timeout(Duration.ofMillis(4000)) // propagate a timeout exception as soon as no item is emitted
                 .single();
     }
 
@@ -77,13 +83,21 @@ public class BankController {
     }
 
     Mono<Quotation> requestForQuotation(String bankUrl, Double loanAmount) {
+
+        Function timeoutHandler = (clientResp) -> { return ClientResponse.create(HttpStatus.BAD_GATEWAY); };
         return WebClient.create().get()
                 .uri(builder -> builder.scheme("http")
                         .port(8080)
                         .host("localhost").path(bankUrl + "/quotation")
                         .queryParam("loanAmount", loanAmount)
                         .build())
-                .retrieve().bodyToMono(Quotation.class);
+                .retrieve()
+//                .onStatus(HttpStatus::isError, () -> Mono.just(new Quotation("itmoutout", 33d)))
+//                .onStatus(HttpStatus::isError, timeoutHandler)
+//                .onStatus(HttpStatus::is5xxServerError, timeoutHandler)
+                .bodyToMono(Quotation.class)
+//                .timeout(Duration.ofSeconds(3), Mono.just(new Quotation("timeout-bank", 55d)));
+                .timeout(Duration.ofSeconds(3), Mono.empty());
 
     }
 
