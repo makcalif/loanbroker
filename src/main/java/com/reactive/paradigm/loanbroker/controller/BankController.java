@@ -26,6 +26,7 @@ import javax.naming.ServiceUnavailableException;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 
@@ -130,6 +131,16 @@ public class BankController {
 //                .timeout(Duration.ofSeconds(3), Mono.just(new Quotation("timeout-bank", 55d)));
                 .timeout(Duration.ofSeconds(3), Mono.empty());
 
+    }
+
+    @GetMapping("nonBlockingGet")
+    public Mono<Quotation> getNonBlockingQuote() {
+        try {
+            TimeUnit.SECONDS.sleep(3);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        return Mono.just(new Quotation("Non Blocking Quote", 100D));
     }
 
 }
