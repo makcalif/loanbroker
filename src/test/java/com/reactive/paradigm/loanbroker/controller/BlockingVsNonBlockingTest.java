@@ -26,9 +26,9 @@ public class BlockingVsNonBlockingTest {
         .bodyToMono(Quotation.class);
 
         quotationMono.subscribe( q -> {
-            System.out.println("non blocking quote is :" +q);
+            System.out.println("non blocking quote is :" +q + " thread:" + Thread.currentThread().getName());
         });
-        System.out.println("subscriber invoked--------------------");
+        System.out.println("subscriber invoked-------------------- thread:"+ Thread.currentThread().getName());
         Thread.sleep(4000);
 
     }
@@ -43,8 +43,8 @@ public class BlockingVsNonBlockingTest {
                         Quotation.class);
 
 
-        System.out.println("  blocking quote is :" +quotation);
-        System.out.println("after getting blocking quote--------------------");
+        System.out.println("  blocking quote is :" +quotation + " thread:" + Thread.currentThread().getName());
+        System.out.println("after getting blocking quote-------------------- thread:" + Thread.currentThread().getName());
 
     }
 }
