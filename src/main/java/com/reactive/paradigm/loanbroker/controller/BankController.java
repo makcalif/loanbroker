@@ -4,21 +4,12 @@ import com.reactive.paradigm.loanbroker.model.BestQuotationResponse;
 import com.reactive.paradigm.loanbroker.model.Quotation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseCookie;
-import org.springframework.http.ResponseEntity;
-import org.springframework.http.client.reactive.ClientHttpResponse;
-import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.reactive.function.BodyExtractor;
-import org.springframework.web.reactive.function.client.ClientResponse;
-import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -27,20 +18,19 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-import java.util.function.Function;
 
 @RestController
 public class BankController {
     Logger logger = LoggerFactory.getLogger(BankController.class);
 
     private static final Quotation QUOTATION_IN_CASE_OF_ERROR = new Quotation("bank-error", Double.MAX_VALUE);
+    private static final Quotation QUOTATION_IN_CASE_OF_TIMEOUT = new Quotation("timeout", Double.MAX_VALUE);
 
     @GetMapping("/{bank}/quotation") // bank name format is bank-[1-9]
     public Mono<Quotation> quotation (final @PathVariable("bank") String bank, final @RequestParam(value="loanAmount", required = true) Double loanAmount) {
         char bankIndex = bank.charAt(5);
 
-        double interestRate = bankIndex == '5' ? 0.001d : ((double) bankIndex) / 100d;
+        double interestRate =  ((double) bankIndex) / 100d;
         logger.info("interest rate for bank {} is {}", bank, interestRate);
 
         if (bankIndex == '2') {
@@ -51,7 +41,7 @@ public class BankController {
 
         if (bankIndex == '3') {
             return Mono.delay(Duration.ofMillis(4000))
-                    .log()
+                    //.log()
                     .then(Mono.just(new Quotation("Bank-" + bankIndex, loanAmount)));
         }
 
@@ -60,7 +50,7 @@ public class BankController {
 
     @GetMapping("/getBestQuotation")
     public Mono<BestQuotationResponse> getBestQuotation() {
-        Flux<String> banksUrl = Flux.just("Bank-1", "Bank-2", "Bank-3");
+        Flux<String> banksUrl = Flux.just("Bank-1", "Bank-2", "Bank-3", "Bank-4", "Bank-5", "Bank-6");
         Double loanAmount = 1000d;
 
         return Flux.from(banksUrl)
@@ -69,10 +59,11 @@ public class BankController {
                      .onErrorResume(e -> Mono.just(QUOTATION_IN_CASE_OF_ERROR));
                     return mq;
                 })
-                .log()
+                //.log()
                 .filter(offer -> {
                     logger.info("offer is {} ", offer);
-                    return !offer.equals(QUOTATION_IN_CASE_OF_ERROR);
+                    return ! (offer.equals(QUOTATION_IN_CASE_OF_ERROR)) ; //||
+                            //offer.equals(QUOTATION_IN_CASE_OF_TIMEOUT));
                 })
                 .collect(() -> new BestQuotationResponse(loanAmount), BestQuotationResponse::offer)
                 .doOnSuccess(BestQuotationResponse::finish)
@@ -113,7 +104,8 @@ public class BankController {
                     }
                     return res.bodyToMono(Quotation.class);
                 })
-                .timeout(Duration.ofSeconds(3), Mono.just(new Quotation(bankUrl + "timed out", 0.00)));
+                //.timeout(Duration.ofSeconds(3), Mono.just(new Quotation(bankUrl + "timed out", 0.00)));
+                .timeout(Duration.ofSeconds(3), Mono.just(QUOTATION_IN_CASE_OF_TIMEOUT));
     }
 
     public Mono<Quotation> requestForQuotationUsingRetrieve(String bankUrl, Double loanAmount) {
