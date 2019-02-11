@@ -11,14 +11,9 @@ import java.time.Duration;
 
 public class NonWebClient {
 
-    //@Autowired
-
-
-    private void getLoanQuotes() {
+     private void getLoanQuotes() {
 
         BankController bankController = new BankController();
-
-        //bankController.requestForQuotation();
 
         Flux<String> banksUrl = Flux.just("Bank-1", "Bank-2", "Bank-3");
         Double loanAmount = 1000d;
@@ -28,7 +23,6 @@ public class NonWebClient {
                     Mono<Quotation> mq = bankController.requestForQuotation(bankUrl, loanAmount);
                     return mq;
                 })
-                .log("MKKKK")
                 //.onErrorResume(ex -> Mono.just(new Quotation("exception mesg", 33D)))
                 .blockLast();
 
